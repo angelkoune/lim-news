@@ -1,0 +1,41 @@
+php
+<?php
+// URL de ton flux RSS WordPress
+$feedUrl = 'https://www.luxe-infinity-maroc.com/feed';
+
+// Appel via cURL car file_get_contents ne fonctionne pas
+$ch = curl_init();
+curl_setopt($ch, CURLOPT_URL, $feedUrl);
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
+curl_setopt($ch, CURLOPT_TIMEOUT, 10);
+curl_setopt($ch, CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V4);
+$data = curl_exec($ch);
+
+if (!$data || curl_errno($ch)) {
+    die("Erreur : impossible de charger le flux RSS via cURL. " . curl_error($ch));
+}
+curl_close($ch);
+
+// Charger le contenu RSS
+$xml = @simplexml_load_string($data);
+if (!$xml) {
+    die("Erreur : le contenu du RSS est invalide.");
+}
+
+// Supprimer toutes les balises media:content et autres préfixes non déclarés
+foreach ($xml->channel->item as $item) {
+    foreach ($item->children('media', true) as $media) {
+        unset($media[0]);
+    }
+    // Nettoyer le style dans <description>
+    $desc = strip_tags((string)$item->description, '<p><br><b><i><strong><em>');
+    $desc = preg_replace('/style="[^"]+"/i', '', $desc);
+    $item->description = $desc;
+}
+
+// Réponse XML propre
+header('Content-Type: application/rss+xml; charset=utf-8');
+echo $xml->asXML();
+?>
